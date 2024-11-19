@@ -23,6 +23,15 @@ type InsurancePolicy struct {
 	TermsConditions     map[string]bool   `json:"termsConditions"` // Using a map for terms and conditions
 }
 
+// Registration represents a user's registration for a policy
+type Registration struct {
+	UserID           string  `json:"userId"`
+	PolicyID         string  `json:"policyId"`
+	PremiumPaid      float64 `json:"premiumPaid"`
+	IsNonSmoker      bool    `json:"isNonSmoker"`
+	HasDisease       bool    `json:"hasDisease"`
+}
+
 // DefinePolicy allows insurance providers to define and register a new policy with a given PolicyID or a deterministic one.
 func (s *SmartContract) DefinePolicy(ctx contractapi.TransactionContextInterface, policyId string, policyType string, coverageAmount float64, premiumAmount float64, startDate string, endDate string, termsConditions map[string]bool) (string, error) {
 	// If the policyId is empty, create a deterministic PolicyID based on input fields
@@ -79,6 +88,69 @@ func (s *SmartContract) QueryPolicy(ctx contractapi.TransactionContextInterface,
 
 	return &policy, nil
 }
+
+
+// RegisterForPolicy allows a user to register for a policy
+func (s *SmartContract) RegisterForPolicy(ctx contractapi.TransactionContextInterface, userId string, policyId string, premiumPaid float64, isNonSmoker bool, hasDisease bool) (string, error) {
+	// Query the policy details to check the premium amount requirement
+	policy, err := s.QueryPolicy(ctx, policyId)
+	if err != nil {
+		return "", err
+	}
+
+	// Check if the premium paid matches the required premium amount
+	if premiumPaid != policy.PremiumAmount {
+		return "", fmt.Errorf("the premium paid does not match the policy's required premium amount")
+	}
+
+	// Create the registration entry
+	registration := Registration{
+		UserID:      userId,
+		PolicyID:    policyId,
+		PremiumPaid: premiumPaid,
+		IsNonSmoker: isNonSmoker,
+		HasDisease:  hasDisease,
+	}
+
+	// Serialize the registration data
+	registrationBytes, err := json.Marshal(registration)
+	if err != nil {
+		return "", fmt.Errorf("failed to serialize registration: %v", err)
+	}
+
+	// Store the registration data in the ledger
+	registrationKey := fmt.Sprintf("%s-%s", userId, policyId)
+	err = ctx.GetStub().PutState(registrationKey, registrationBytes)
+	if err != nil {
+		return "", fmt.Errorf("failed to store registration on the ledger: %v", err)
+	}
+
+	return "Registration successful", nil
+}
+
+// QueryRegistration retrieves the registration details for a user and a policy
+func (s *SmartContract) QueryRegistration(ctx contractapi.TransactionContextInterface, userId string, policyId string) (*Registration, error) {
+	// Query the registration using the user ID and policy ID
+	registrationKey := fmt.Sprintf("%s-%s", userId, policyId)
+	registrationBytes, err := ctx.GetStub().GetState(registrationKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read registration from the ledger: %v", err)
+	}
+	if registrationBytes == nil {
+		return nil, fmt.Errorf("registration for user %s and policy %s does not exist", userId, policyId)
+	}
+
+	var registration Registration
+	err = json.Unmarshal(registrationBytes, &registration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deserialize registration data: %v", err)
+	}
+
+	return &registration, nil
+}
+
+
+
 
 // main function to start the chaincode
 func main() {
