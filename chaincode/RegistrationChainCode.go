@@ -14,37 +14,34 @@ type SmartContract struct {
 
 // InsurancePolicy represents an insurance policy with necessary details
 type InsurancePolicy struct {
-	PolicyID           string  `json:"policyId"`
-	PolicyType         string  `json:"policyType"`
-	CoverageAmount     float64 `json:"coverageAmount"`
-	PremiumAmount      float64 `json:"premiumAmount"`
-	PolicyStartDate    string  `json:"policyStartDate"`
-	PolicyEndDate      string  `json:"policyEndDate"`
-	TermsConditionsHash string  `json:"termsConditionsHash"`
+	PolicyID            string            `json:"policyId"`
+	PolicyType          string            `json:"policyType"`
+	CoverageAmount      float64           `json:"coverageAmount"`
+	PremiumAmount       float64           `json:"premiumAmount"`
+	PolicyStartDate     string            `json:"policyStartDate"`
+	PolicyEndDate       string            `json:"policyEndDate"`
+	TermsConditions     map[string]bool   `json:"termsConditions"` // Using a map for terms and conditions
 }
 
 // DefinePolicy allows insurance providers to define and register a new policy with a given PolicyID or a deterministic one.
-func (s *SmartContract) DefinePolicy(ctx contractapi.TransactionContextInterface, policyId string, policyType string, coverageAmount float64, premiumAmount float64, startDate string, endDate string, termsConditions string) (string, error) {
+func (s *SmartContract) DefinePolicy(ctx contractapi.TransactionContextInterface, policyId string, policyType string, coverageAmount float64, premiumAmount float64, startDate string, endDate string, termsConditions map[string]bool) (string, error) {
 	// If the policyId is empty, create a deterministic PolicyID based on input fields
 	if policyId == "" {
 		deterministicID := fmt.Sprintf("%s-%s-%s-%f-%f", policyType, startDate, endDate, coverageAmount, premiumAmount)
 
-		// Calculate hash of the deterministic ID for uniqueness and consistency
+		// Create a deterministic PolicyID based on the unique combination of the provided fields
 		policyId = fmt.Sprintf("%x", sha256.Sum256([]byte(deterministicID)))
 	}
 
-	// Calculate hash of terms and conditions for integrity and privacy
-	termsConditionsHash := fmt.Sprintf("%x", sha256.Sum256([]byte(termsConditions)))
-
-	// Create an InsurancePolicy instance
+	// Create an InsurancePolicy instance with TermsConditions as a map
 	policy := InsurancePolicy{
-		PolicyID:           policyId,
-		PolicyType:         policyType,
-		CoverageAmount:     coverageAmount,
-		PremiumAmount:      premiumAmount,
-		PolicyStartDate:    startDate,
-		PolicyEndDate:      endDate,
-		TermsConditionsHash: termsConditionsHash,
+		PolicyID:        policyId,
+		PolicyType:      policyType,
+		CoverageAmount:  coverageAmount,
+		PremiumAmount:   premiumAmount,
+		PolicyStartDate: startDate,
+		PolicyEndDate:   endDate,
+		TermsConditions: termsConditions,
 	}
 
 	// Serialize policy to JSON format
