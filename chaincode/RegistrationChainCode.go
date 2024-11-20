@@ -36,6 +36,13 @@ type Registration struct {
 	HasDisease       bool    `json:"hasDisease"`
 }
 
+//private data for testing
+type PrivateData struct {
+    ID   string `json:"id"`
+    Data string `json:"data"`
+}
+
+
 // DefinePolicy allows insurance providers to define and register a new policy with a given PolicyID or a deterministic one.
 func (s *SmartContract) DefinePolicy(ctx contractapi.TransactionContextInterface, policyId string, policyType string, coverageAmount float64, premiumAmount float64, startDate string, endDate string, termsConditions map[string]bool) (string, error) {
 	// If the policyId is empty, create a deterministic PolicyID based on input fields
@@ -248,6 +255,61 @@ func (s *SmartContract) QueryHealthRecords(ctx contractapi.TransactionContextInt
     return string(recordData), nil
 }
 
+
+
+// StorePrivateData: Allows Org1 to store private data
+func (s *SmartContract) StorePrivateData(ctx contractapi.TransactionContextInterface, id string, data string) error {
+    // Check if the caller is Org1
+    orgID, err := ctx.GetClientIdentity().GetMSPID()
+    if err != nil {
+        return fmt.Errorf("failed to get client identity: %v", err)
+    }
+    if orgID != "Org1MSP" {
+        return fmt.Errorf("Org1 is the only allowed organization to write this data")
+    }
+
+    privateData := PrivateData{
+        ID:   id,
+        Data: data,
+    }
+
+    // Store private data in Org1's private collection
+    privateDataJSON, err := json.Marshal(privateData)
+    if err != nil {
+        return fmt.Errorf("failed to marshal private data: %v", err)
+    }
+
+    return ctx.GetStub().PutPrivateData("Org1MSPPrivateCollection", id, privateDataJSON)
+}
+
+// GetPrivateData: Allows Org1 to read its own private data
+func (s *SmartContract) GetPrivateData(ctx contractapi.TransactionContextInterface, id string) (*PrivateData, error) {
+    // Check if the caller is Org1
+    orgID, err := ctx.GetClientIdentity().GetMSPID()
+    if err != nil {
+        return nil, fmt.Errorf("failed to get client identity: %v", err)
+    }
+    if orgID != "Org1MSP" {
+        return nil, fmt.Errorf("Org1 is the only allowed organization to read this data")
+    }
+
+    // Retrieve the private data from Org1's private collection
+    privateDataJSON, err := ctx.GetStub().GetPrivateData("Org1MSPPrivateCollection", id)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get private data: %v", err)
+    }
+    if privateDataJSON == nil {
+        return nil, fmt.Errorf("no private data found with ID %s", id)
+    }
+
+    var privateData PrivateData
+    err = json.Unmarshal(privateDataJSON, &privateData)
+    if err != nil {
+        return nil, fmt.Errorf("failed to unmarshal private data: %v", err)
+    }
+
+    return &privateData, nil
+}
 
 // main function to start the chaincode
 func main() {
