@@ -156,96 +156,96 @@ func (s *SmartContract) QueryRegistration(ctx contractapi.TransactionContextInte
 
 
 // UploadHealthRecords - Function to upload health record to the collection
-func (s *SmartContract) UploadHealthRecords(ctx contractapi.TransactionContextInterface, healthRecord string) error {
-	// Retrieve the identity of the submitting organization
-	id, err := cid.New(ctx.GetStub()) // Use GetStub() to pass ChaincodeStubInterface
-	if err != nil {
-		return fmt.Errorf("failed to get client identity: %v", err)
-	}
+func (s *SmartContract) UploadHealthRecords(ctx contractapi.TransactionContextInterface, healthRecord string) (string, error) {
+    // Retrieve the identity of the submitting organization
+    id, err := cid.New(ctx.GetStub()) // Use GetStub() to pass ChaincodeStubInterface
+    if err != nil {
+        return "", fmt.Errorf("failed to get client identity: %v", err)
+    }
 
-	org, err := id.GetMSPID()
-	if err != nil {
-		return fmt.Errorf("failed to get MSP ID: %v", err)
-	}
+    org, err := id.GetMSPID()
+    if err != nil {
+        return "", fmt.Errorf("failed to get MSP ID: %v", err)
+    }
 
-	// Generate a simple ID using the current timestamp (can be incremented if needed)
-	timestamp := time.Now().Unix()
-	recordID := strconv.FormatInt(timestamp, 10) // Convert Unix timestamp to string
+    // Generate a simple ID using the current timestamp (can be incremented if needed)
+    timestamp := time.Now().Unix()
+    recordID := strconv.FormatInt(timestamp, 10) // Convert Unix timestamp to string
 
-	// Define the collection based on the organization
-	var collectionName string
-	if org == "Org1MSP" {
-		collectionName = "Org1MSPPrivateCollection"
-	} else if org == "Org2MSP" {
-		collectionName = "Org2MSPPrivateCollection"
-	} else {
-		return fmt.Errorf("organization not recognized: %s", org)
-	}
+    // Define the collection based on the organization
+    var collectionName string
+    if org == "Org1MSP" {
+        collectionName = "Org1MSPPrivateCollection"
+    } else if org == "Org2MSP" {
+        collectionName = "Org2MSPPrivateCollection"
+    } else {
+        return "", fmt.Errorf("organization not recognized: %s", org)
+    }
 
-	// Prepare the health record data
-	recordData := []byte(healthRecord)
+    // Prepare the health record data
+    recordData := []byte(healthRecord)
 
-	// Store the health record in the private collection of the organization
-	err = ctx.GetStub().PutPrivateData(collectionName, recordID, recordData)
-	if err != nil {
-		return fmt.Errorf("failed to store record in private collection: %v", err)
-	}
+    // Store the health record in the private collection of the organization
+    err = ctx.GetStub().PutPrivateData(collectionName, recordID, recordData)
+    if err != nil {
+        return "", fmt.Errorf("failed to store record in private collection: %v", err)
+    }
 
-	// Also store the record in the shared collection to be accessible by both Org1 and Org2
-	err = ctx.GetStub().PutPrivateData("InsuranceregistrationCollection", recordID, recordData)
-	if err != nil {
-		return fmt.Errorf("failed to store record in shared collection: %v", err)
-	}
+    // Also store the record in the shared collection to be accessible by both Org1 and Org2
+    err = ctx.GetStub().PutPrivateData("InsuranceregistrationCollection", recordID, recordData)
+    if err != nil {
+        return "", fmt.Errorf("failed to store record in shared collection: %v", err)
+    }
 
-	// Return success
-	return nil
+    // Return the record ID for further queries
+    return recordID, nil
 }
 
 // QueryHealthRecords - Function to query health records
 func (s *SmartContract) QueryHealthRecords(ctx contractapi.TransactionContextInterface, recordID string) (string, error) {
-	// Retrieve the identity of the client
-	id, err := cid.New(ctx.GetStub()) // Use GetStub() to pass ChaincodeStubInterface
-	if err != nil {
-		return "", fmt.Errorf("failed to get client identity: %v", err)
-	}
+    // Retrieve the identity of the client
+    id, err := cid.New(ctx.GetStub()) // Use GetStub() to pass ChaincodeStubInterface
+    if err != nil {
+        return "", fmt.Errorf("failed to get client identity: %v", err)
+    }
 
-	org, err := id.GetMSPID()
-	if err != nil {
-		return "", fmt.Errorf("failed to get MSP ID: %v", err)
-	}
+    org, err := id.GetMSPID()
+    if err != nil {
+        return "", fmt.Errorf("failed to get MSP ID: %v", err)
+    }
 
-	// Define the collection based on the organization
-	var collectionName string
-	if org == "Org1MSP" {
-		collectionName = "Org1MSPPrivateCollection"
-	} else if org == "Org2MSP" {
-		collectionName = "Org2MSPPrivateCollection"
-	} else {
-		return "", fmt.Errorf("organization not recognized: %s", org)
-	}
+    // Define the collection based on the organization
+    var collectionName string
+    if org == "Org1MSP" {
+        collectionName = "Org1MSPPrivateCollection"
+    } else if org == "Org2MSP" {
+        collectionName = "Org2MSPPrivateCollection"
+    } else {
+        return "", fmt.Errorf("organization not recognized: %s", org)
+    }
 
-	// Try to retrieve the health record from the private collection
-	recordData, err := ctx.GetStub().GetPrivateData(collectionName, recordID)
-	if err != nil {
-		return "", fmt.Errorf("failed to retrieve record from private collection: %v", err)
-	}
+    // Try to retrieve the health record from the private collection
+    recordData, err := ctx.GetStub().GetPrivateData(collectionName, recordID)
+    if err != nil {
+        return "", fmt.Errorf("failed to retrieve record from private collection: %v", err)
+    }
 
-	if recordData != nil {
-		return string(recordData), nil
-	}
+    if recordData != nil {
+        return string(recordData), nil
+    }
 
-	// If the record is not found in the private collection, query the shared collection
-	recordData, err = ctx.GetStub().GetPrivateData("InsuranceregistrationCollection", recordID)
-	if err != nil {
-		return "", fmt.Errorf("failed to retrieve record from shared collection: %v", err)
-	}
+    // If the record is not found in the private collection, query the shared collection
+    recordData, err = ctx.GetStub().GetPrivateData("InsuranceregistrationCollection", recordID)
+    if err != nil {
+        return "", fmt.Errorf("failed to retrieve record from shared collection: %v", err)
+    }
 
-	if recordData == nil {
-		return "", fmt.Errorf("record not found")
-	}
+    if recordData == nil {
+        return "", fmt.Errorf("record not found")
+    }
 
-	// Return the record data
-	return string(recordData), nil
+    // Return the record data
+    return string(recordData), nil
 }
 
 
