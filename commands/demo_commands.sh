@@ -1,0 +1,6 @@
+  peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile $ORDERER_CA -C mychannel -n private $PEER_CONN_PARMS -c '{"Args":["DefinePolicy","Policy123","Health","100000","1000","2024-01-01","2024-12-31", "{\"NonSmoker\":true, \"NoPreExistingDisease\":true}"]}' --waitForEvent
+  peer chaincode query -C mychannel -n private -c '{"Args":["QueryPolicy","Policy123"]}'
+  peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile $ORDERER_CA -C mychannel -n private $PEER_CONN_PARMS -c '{"Args":["RegisterForPolicy","User123","Policy123","1000","true","false"]}' --waitForEvent
+  peer chaincode query -C mychannel -n private -c '{"Args":["QueryRegistration","User123","Policy123"]}'
+  peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile $ORDERER_CA -C mychannel -n private $PEER_CONN_PARMS -c '{"Args":["UploadHealthRecords","Patient is in good health"]}' --waitForEvent
+  peer chaincode query -C mychannel -n private -c '{"Args":["QueryHealthRecords","1732712031"]}'
