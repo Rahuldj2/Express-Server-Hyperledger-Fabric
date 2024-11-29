@@ -1,0 +1,1 @@
+ ./network.sh deployCC -ccn private -ccp ./chaincode/insurance-registration/ -ccl go -ccep "OR('Org1MSP.peer','Org2MSP.peer')" -cccg ./chaincode/insurance-registration/collections_config.json
