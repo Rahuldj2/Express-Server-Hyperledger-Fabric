@@ -7,11 +7,11 @@
 
 
 #TIMESTAMP COMMANDS
-peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile $ORDERER_CA -C mychannel -n private $PEER_CONN_PARMS -c '{"Args":["UploadHealthRecords","Record123","Patient is in good health"]}' --waitForEvent
+peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile $ORDERER_CA -C mychannel -n registration $PEER_CONN_PARMS -c '{"Args":["UploadHealthRecords","Record123","Patient is in good health"]}' --waitForEvent
 
 
 
-  peer chaincode query -C mychannel -n private --peerAddresses localhost:7051 --tlsRootCertFiles /home/rahul/hyperledger-fabric/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt -c '{"Args":["GetPrivateData","123"]}'
-  peer chaincode query -C mychannel -n private --peerAddresses localhost:9051 --tlsRootCertFiles /home/rahul/hyperledger-fabric/fabric-samples/test-network/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt -c '{"Args":["GetPrivateData","123"]}'
+  peer chaincode query -C mychannel -n registration --peerAddresses localhost:7051 --tlsRootCertFiles /home/rahul/hyperledger-fabric/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt -c '{"Args":["GetPrivateData","123"]}'
+  peer chaincode query -C mychannel -n registration --peerAddresses localhost:9051 --tlsRootCertFiles /home/rahul/hyperledger-fabric/fabric-samples/test-network/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt -c '{"Args":["GetPrivateData","123"]}'
 
-  peer chaincode query -C mychannel -n private --peerAddresses localhost:9051 --tlsRootCertFiles /home/rahul/hyperledger-fabric/fabric-samples/test-network/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt -c '{"Args":["QueryHealthRecords","Record123"]}'
+  peer chaincode query -C mychannel -n registration --peerAddresses localhost:9051 --tlsRootCertFiles /home/rahul/hyperledger-fabric/fabric-samples/test-network/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt -c '{"Args":["QueryHealthRecords","Record123"]}'
