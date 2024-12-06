@@ -1,0 +1,1 @@
+peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile $ORDERER_CA -C mychannel -n registration $PEER_CONN_PARMS -c '{"function":"RegisterForPolicy","Args":["userID001","policyID001","1000.0","true","false","true"]}'

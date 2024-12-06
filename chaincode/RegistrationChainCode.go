@@ -101,43 +101,60 @@ func (s *SmartContract) QueryPolicy(ctx contractapi.TransactionContextInterface,
 }
 
 
-// RegisterForPolicy allows a user to register for a policy
-func (s *SmartContract) RegisterForPolicy(ctx contractapi.TransactionContextInterface, userId string, policyId string, premiumPaid float64, isNonSmoker bool, hasDisease bool) (string, error) {
-	// Query the policy details to check the premium amount requirement
-	policy, err := s.QueryPolicy(ctx, policyId)
+// RegisterForPolicy: Allows users to register for a policy, while Org2 queries health records for validation
+func (s *SmartContract) RegisterForPolicy(ctx contractapi.TransactionContextInterface, userID, policyID string, premiumPaid float64, isNonSmoker, hasDisease bool, consent bool) error {
+	// Fetch the policy to validate if criteria match
+	policyJSON, err := ctx.GetStub().GetState(policyID)
 	if err != nil {
-		return "", err
+		return fmt.Errorf("failed to fetch policy with ID %s: %v", policyID, err)
+	}
+	if policyJSON == nil {
+		return fmt.Errorf("policy with ID %s not found", policyID)
 	}
 
-	// Check if the premium paid matches the required premium amount
-	if premiumPaid != policy.PremiumAmount {
-		return "", fmt.Errorf("the premium paid does not match the policy's required premium amount")
-	}
-
-	// Create the registration entry
-	registration := Registration{
-		UserID:      userId,
-		PolicyID:    policyId,
-		PremiumPaid: premiumPaid,
-		IsNonSmoker: isNonSmoker,
-		HasDisease:  hasDisease,
-	}
-
-	// Serialize the registration data
-	registrationBytes, err := json.Marshal(registration)
+	var policy Policy
+	err = json.Unmarshal(policyJSON, &policy)
 	if err != nil {
-		return "", fmt.Errorf("failed to serialize registration: %v", err)
+		return fmt.Errorf("failed to unmarshal policy: %v", err)
 	}
 
-	// Store the registration data in the ledger
-	registrationKey := fmt.Sprintf("%s-%s", userId, policyId)
-	err = ctx.GetStub().PutState(registrationKey, registrationBytes)
-	if err != nil {
-		return "", fmt.Errorf("failed to store registration on the ledger: %v", err)
-	}
+	// Fetch the health records only if consent is granted by the patient
+	if consent {
+		// Org2 queries the health records within a valid window
+		privateData, err := s.QueryHealthRecords(ctx, userID)
+		if err != nil {
+			return fmt.Errorf("failed to query health records: %v", err)
+		}
 
-	return "Registration successful", nil
+		// Validate the health records against the policy criteria
+		if policy.Criteria.IsNonSmoker != isNonSmoker {
+			return fmt.Errorf("user's smoking status does not match policy criteria")
+		}
+		if policy.Criteria.HasDisease != hasDisease {
+			return fmt.Errorf("user's disease status does not match policy criteria")
+		}
+
+		// If validation passes, register the user for the policy
+		registration := Registration{
+			UserID:      userID,
+			PolicyID:    policyID,
+			PremiumPaid: premiumPaid,
+			IsNonSmoker: isNonSmoker,
+			HasDisease:  hasDisease,
+		}
+
+		// Store the registration
+		registrationJSON, err := json.Marshal(registration)
+		if err != nil {
+			return fmt.Errorf("failed to marshal registration: %v", err)
+		}
+
+		return ctx.GetStub().PutState(fmt.Sprintf("%s-%s", userID, policyID), registrationJSON)
+	} else {
+		return fmt.Errorf("patient consent is required to query health records")
+	}
 }
+
 
 // QueryRegistration retrieves the registration details for a user and a policy
 func (s *SmartContract) QueryRegistration(ctx contractapi.TransactionContextInterface, userId string, policyId string) (*Registration, error) {
@@ -257,59 +274,7 @@ func (s *SmartContract) QueryHealthRecords(ctx contractapi.TransactionContextInt
 
 
 
-// StorePrivateData: Allows Org1 to store private data
-func (s *SmartContract) StorePrivateData(ctx contractapi.TransactionContextInterface, id string, data string) error {
-    // Check if the caller is Org1
-    orgID, err := ctx.GetClientIdentity().GetMSPID()
-    if err != nil {
-        return fmt.Errorf("failed to get client identity: %v", err)
-    }
-    if orgID != "Org1MSP" {
-        return fmt.Errorf("Org1 is the only allowed organization to write this data")
-    }
 
-    privateData := PrivateData{
-        ID:   id,
-        Data: data,
-    }
-
-    // Store private data in Org1's private collection
-    privateDataJSON, err := json.Marshal(privateData)
-    if err != nil {
-        return fmt.Errorf("failed to marshal private data: %v", err)
-    }
-
-    return ctx.GetStub().PutPrivateData("Org1MSPPrivateCollection", id, privateDataJSON)
-}
-
-// GetPrivateData: Allows Org1 to read its own private data
-func (s *SmartContract) GetPrivateData(ctx contractapi.TransactionContextInterface, id string) (*PrivateData, error) {
-    // Check if the caller is Org1
-    orgID, err := ctx.GetClientIdentity().GetMSPID()
-    if err != nil {
-        return nil, fmt.Errorf("failed to get client identity: %v", err)
-    }
-    if orgID != "Org1MSP" {
-        return nil, fmt.Errorf("Org1 is the only allowed organization to read this data")
-    }
-
-    // Retrieve the private data from Org1's private collection
-    privateDataJSON, err := ctx.GetStub().GetPrivateData("Org1MSPPrivateCollection", id)
-    if err != nil {
-        return nil, fmt.Errorf("failed to get private data: %v", err)
-    }
-    if privateDataJSON == nil {
-        return nil, fmt.Errorf("no private data found with ID %s", id)
-    }
-
-    var privateData PrivateData
-    err = json.Unmarshal(privateDataJSON, &privateData)
-    if err != nil {
-        return nil, fmt.Errorf("failed to unmarshal private data: %v", err)
-    }
-
-    return &privateData, nil
-}
 
 // main function to start the chaincode
 func main() {
@@ -328,3 +293,71 @@ func main() {
 		fmt.Printf("Error starting chaincode: %s", err.Error())
 	}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// StorePrivateData: Allows Org1 to store private data
+// func (s *SmartContract) StorePrivateData(ctx contractapi.TransactionContextInterface, id string, data string) error {
+//     // Check if the caller is Org1
+//     orgID, err := ctx.GetClientIdentity().GetMSPID()
+//     if err != nil {
+//         return fmt.Errorf("failed to get client identity: %v", err)
+//     }
+//     if orgID != "Org1MSP" {
+//         return fmt.Errorf("Org1 is the only allowed organization to write this data")
+//     }
+
+//     privateData := PrivateData{
+//         ID:   id,
+//         Data: data,
+//     }
+
+//     // Store private data in Org1's private collection
+//     privateDataJSON, err := json.Marshal(privateData)
+//     if err != nil {
+//         return fmt.Errorf("failed to marshal private data: %v", err)
+//     }
+
+//     return ctx.GetStub().PutPrivateData("Org1MSPPrivateCollection", id, privateDataJSON)
+// }
+
+// // GetPrivateData: Allows Org1 to read its own private data
+// func (s *SmartContract) GetPrivateData(ctx contractapi.TransactionContextInterface, id string) (*PrivateData, error) {
+//     // Check if the caller is Org1
+//     orgID, err := ctx.GetClientIdentity().GetMSPID()
+//     if err != nil {
+//         return nil, fmt.Errorf("failed to get client identity: %v", err)
+//     }
+//     if orgID != "Org1MSP" {
+//         return nil, fmt.Errorf("Org1 is the only allowed organization to read this data")
+//     }
+
+//     // Retrieve the private data from Org1's private collection
+//     privateDataJSON, err := ctx.GetStub().GetPrivateData("Org1MSPPrivateCollection", id)
+//     if err != nil {
+//         return nil, fmt.Errorf("failed to get private data: %v", err)
+//     }
+//     if privateDataJSON == nil {
+//         return nil, fmt.Errorf("no private data found with ID %s", id)
+//     }
+
+//     var privateData PrivateData
+//     err = json.Unmarshal(privateDataJSON, &privateData)
+//     if err != nil {
+//         return nil, fmt.Errorf("failed to unmarshal private data: %v", err)
+//     }
+
+//     return &privateData, nil
+// }
