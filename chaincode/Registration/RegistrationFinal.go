@@ -134,7 +134,7 @@ func (s *SmartContract) RegisterForPolicy(ctx contractapi.TransactionContextInte
 	}
 
 	// Validate if the premium paid matches the required premium
-	if premiumPaid != policy.Premium{
+	if premiumPaid != policy.Premium {
 		return fmt.Errorf("premium paid %.2f does not match the required premium %.2f", premiumPaid, policy.Premium)
 	}
 
@@ -169,7 +169,18 @@ func (s *SmartContract) RegisterForPolicy(ctx contractapi.TransactionContextInte
 			return fmt.Errorf("failed to marshal registration: %v", err)
 		}
 
-		return ctx.GetStub().PutState(fmt.Sprintf("%s-%s", userID, policyID), registrationJSON)
+		err = ctx.GetStub().PutState(fmt.Sprintf("%s-%s", userID, policyID), registrationJSON)
+		if err != nil {
+			return fmt.Errorf("failed to store registration: %v", err)
+		}
+
+		// Store the userID -> policyID mapping for cross-chaincode access
+		err = s.UpdateUserPolicyMapping(ctx, userID, policyID)
+		if err != nil {
+			return fmt.Errorf("failed to update user-policy mapping: %v", err)
+		}
+
+		return nil
 	} else {
 		return fmt.Errorf("patient consent is required to query health records")
 	}
@@ -196,6 +207,45 @@ func (s *SmartContract) QueryRegistration(ctx contractapi.TransactionContextInte
 
 	return &registration, nil
 }
+
+// UpdateUserPolicyMapping: Updates the userID -> policyID mapping
+func (s *SmartContract) UpdateUserPolicyMapping(ctx contractapi.TransactionContextInterface, userID, policyID string) error {
+	// Create a composite key for user-policy mapping
+	mappingKey, err := ctx.GetStub().CreateCompositeKey("UserPolicyMapping", []string{userID})
+	if err != nil {
+		return fmt.Errorf("failed to create composite key: %v", err)
+	}
+
+	// Store the mapping as userID -> policyID
+	err = ctx.GetStub().PutState(mappingKey, []byte(policyID))
+	if err != nil {
+		return fmt.Errorf("failed to store user-policy mapping: %v", err)
+	}
+
+	return nil
+}
+
+// QueryPolicyByUserID: Queries the policy ID linked to a specific user ID
+func (s *SmartContract) QueryPolicyByUserID(ctx contractapi.TransactionContextInterface, userID string) (string, error) {
+	// Create a composite key for user-policy mapping
+	mappingKey, err := ctx.GetStub().CreateCompositeKey("UserPolicyMapping", []string{userID})
+	if err != nil {
+		return "", fmt.Errorf("failed to create composite key: %v", err)
+	}
+
+	// Retrieve the policy ID using the mapping key
+	policyIDBytes, err := ctx.GetStub().GetState(mappingKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve policy ID: %v", err)
+	}
+	if policyIDBytes == nil {
+		return "", fmt.Errorf("no policy found for user ID %s", userID)
+	}
+
+	return string(policyIDBytes), nil
+}
+
+
 
 
 
