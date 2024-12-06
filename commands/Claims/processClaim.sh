@@ -1,1 +1,1 @@
-peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile $ORDERER_CA -C mychannel -n registration $PEER_CONN_PARMS -c '{"function":"ProcessClaim","Args":["user1"]}'
+peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile $ORDERER_CA -C mychannel -n claims $PEER_CONN_PARMS -c '{"function":"ProcessClaim","Args":["user1"]}'

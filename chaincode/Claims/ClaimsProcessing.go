@@ -11,6 +11,14 @@ type SmartContract struct {
 	contractapi.Contract
 }
 
+type Claim struct {
+	UserID           string  `json:"userId"`
+	PolicyID         string  `json:"policyId"`
+	SettlementAmount float64 `json:"settlementAmount"`
+	HospitalName     string  `json:"hospitalName"`
+	Status           string  `json:"status"` // Example: "Processed", "Pending"
+}
+
 // PatientDetails defines the structure for storing patient details in the private data collection
 type PatientDetails struct {
 	UserID         string `json:"userId"`
@@ -57,7 +65,7 @@ func (s *SmartContract) UploadPatientDetails(ctx contractapi.TransactionContextI
 	return ctx.GetStub().PutPrivateData("Org1MSPPrivateCollection", userID, patientDetailsJSON)
 }
 
-// ProcessClaim processes a claim for a user
+// ProcessClaim processes a claim for a user and stores the claim details
 func (s *SmartContract) ProcessClaim(ctx contractapi.TransactionContextInterface, userID string) error {
 	// Step 1: Query the policy ID associated with the user from the RegistrationContract
 	args := [][]byte{[]byte("QueryPolicyByUserID"), []byte(userID)}
@@ -116,11 +124,51 @@ func (s *SmartContract) ProcessClaim(ctx contractapi.TransactionContextInterface
 	// Step 5: Calculate the settlement amount (e.g., 50% of the cover amount for simplicity)
 	settlementAmount := policy.CoverAmount * 0.5
 
-	// Step 6: Simulate hospital payment (for now, just log the settlement amount)
-	fmt.Printf("Hospital %s paid settlement amount of %.2f for user %s\n", patientDetails.HospitalName, settlementAmount, userID)
+	// Step 6: Store the claim details
+	claim := Claim{
+		UserID:           userID,
+		PolicyID:         policyID,
+		SettlementAmount: settlementAmount,
+		HospitalName:     patientDetails.HospitalName,
+		Status:           "Processed",
+	}
+
+	// Serialize the claim to JSON
+	claimJSON, err := json.Marshal(claim)
+	if err != nil {
+		return fmt.Errorf("failed to serialize claim: %v", err)
+	}
+
+	// Store the claim details in a collection (e.g., "claims")
+	err = ctx.GetStub().PutPrivateData("ClaimsPrivateCollection", userID, claimJSON)
+	if err != nil {
+		return fmt.Errorf("failed to store claim details: %v", err)
+	}
 
 	return nil
 }
+
+
+// QueryClaim retrieves claim details by userID
+func (s *SmartContract) QueryClaim(ctx contractapi.TransactionContextInterface, userID string) (*Claim, error) {
+	claimJSON, err := ctx.GetStub().GetPrivateData("ClaimsPrivateCollection", userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch claim: %v", err)
+	}
+	if claimJSON == nil {
+		return nil, fmt.Errorf("no claim found for user %s", userID)
+	}
+
+	var claim Claim
+	err = json.Unmarshal(claimJSON, &claim)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal claim: %v", err)
+	}
+
+	return &claim, nil
+}
+
+
 
 func main() {
 	claimsContract := new(SmartContract)
