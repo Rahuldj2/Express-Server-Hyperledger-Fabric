@@ -44,6 +44,9 @@ type Criteria struct {
 	HasDisease   bool `json:"hasDisease"`
 }
 
+var patientDetailsList = make(map[string]PatientDetails) // Map to store policies by policyID
+
+
 // UploadPatientDetails allows Org1 to upload patient details to the PDC
 func (s *SmartContract) UploadPatientDetails(ctx contractapi.TransactionContextInterface, userID string, diseaseDiagnosis string, treatmentPlan string, hospitalName string, admissionDate string, dischargeDate string) error {
 	patientDetails := PatientDetails{
@@ -55,15 +58,63 @@ func (s *SmartContract) UploadPatientDetails(ctx contractapi.TransactionContextI
 		DischargeDate:    dischargeDate,
 	}
 
+	patientDetailsList[userID]=patientDetails
 	// Serialize the patient details to JSON
 	patientDetailsJSON, err := json.Marshal(patientDetails)
 	if err != nil {
 		return fmt.Errorf("failed to serialize patient details: %v", err)
 	}
 
+
+
 	// Store the patient details in the private data collection
 	return ctx.GetStub().PutPrivateData("Org1MSPPrivateCollection", userID, patientDetailsJSON)
 }
+
+
+// / QueryAllPolicies retrieves all policies from the in-memory list or ledger
+func (s *SmartContract) QueryAllPatientData(ctx contractapi.TransactionContextInterface) ([]PatientDetails, error) {
+	var patients []PatientDetails
+
+	// First, check if patients are available in the in-memory store
+	if len(patientDetailsList) > 0 {
+		for _, patient := range patientDetailsList {
+			patients = append(patients, patient)
+		}
+	} else {
+		// If no patients in-memory, query the ledger
+		startKey := ""
+		endKey := ""
+
+		iterator, err := ctx.GetStub().GetStateByRange(startKey, endKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve patients from ledger: %v", err)
+		}
+		defer iterator.Close()
+
+		for iterator.HasNext() {
+			queryResponse, err := iterator.Next()
+			if err != nil {
+				return nil, fmt.Errorf("failed to retrieve next patient entry during iteration: %v", err)
+			}
+
+			var patient PatientDetails
+			err = json.Unmarshal(queryResponse.Value, &patient)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal patient JSON from value: %v", err)
+			}
+
+			patients= append(patients, patient)
+		}
+
+		if len(patients) == 0 {
+			return nil, fmt.Errorf("no patients found in the ledger")
+		}
+	}
+
+	return patients, nil
+}
+
 
 // ProcessClaim processes a claim for a user and stores the claim details
 func (s *SmartContract) ProcessClaim(ctx contractapi.TransactionContextInterface, userID string) error {

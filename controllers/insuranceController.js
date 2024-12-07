@@ -126,9 +126,9 @@ module.exports = {
             const healthRecord = JSON.parse(result.toString());
 
             res.status(200).json(healthRecord);
-        } catch (error) {
-            console.error('Error querying health records:', error);
-            res.status(500).json({ error: error.message });
+        } catch (err) {
+            console.error('Error querying health records:', err);
+            res.status(500).json({ message: "Error querying health records. Please try again later.", error: err.message });
         }
     },
 
