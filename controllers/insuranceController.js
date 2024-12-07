@@ -48,8 +48,16 @@ module.exports = {
     registerForPolicy: async (req, res) => {
         const { userID, policyID, premiumPaid, isNonSmoker, hasDisease, consent } = req.body;
         try {
-            const network = await connectToNetwork('org2', 'Admin@org2.example.com');
+            console.log("connecting")
+            const network = await connectToNetwork('org1', 'Admin@org1.example.com');//org1 check
+            console.log("connected")
             const contract = network.getContract(CONTRACT_NAME);
+            console.log(userID)
+            console.log(policyID)
+            console.log(premiumPaid)
+            console.log(isNonSmoker)
+            console.log(hasDisease)
+            console.log(consent)
 
             await contract.submitTransaction(
                 'RegisterForPolicy',

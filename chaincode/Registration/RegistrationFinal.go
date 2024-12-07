@@ -53,6 +53,9 @@ type Criteria struct {
 	HasDisease   bool `json:"hasDisease"`
 }
 
+var policyList = make(map[string]Policy) // Map to store policies by policyID
+
+
 // DefinePolicy: Allows Org2 to define a policy(insurance provider)
 func (s *SmartContract) DefinePolicy(ctx contractapi.TransactionContextInterface, policyID, policyType string, coverAmount, premium float64, startDate, endDate, criteriaJSON string, diseasesJSON string) error {
 	var criteria Criteria
@@ -85,6 +88,8 @@ func (s *SmartContract) DefinePolicy(ctx contractapi.TransactionContextInterface
 		Criteria:      criteria,
 		CoveredDiseases: coveredDiseases,
 	}
+	//list storage
+	policyList[policyID] = policy
 
 	policyJSON, err := json.Marshal(policy)
 	if err != nil {
@@ -114,6 +119,49 @@ func (s *SmartContract) QueryPolicy(ctx contractapi.TransactionContextInterface,
 	}
 
 	return &policy, nil
+}
+
+// / QueryAllPolicies retrieves all policies from the in-memory list or ledger
+func (s *SmartContract) QueryAllPolicies(ctx contractapi.TransactionContextInterface) ([]Policy, error) {
+	var policies []Policy
+
+	// First, check if policies are available in the in-memory store
+	if len(policyList) > 0 {
+		for _, policy := range policyList {
+			policies = append(policies, policy)
+		}
+	} else {
+		// If no policies in-memory, query the ledger
+		startKey := ""
+		endKey := ""
+
+		iterator, err := ctx.GetStub().GetStateByRange(startKey, endKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve policies from ledger: %v", err)
+		}
+		defer iterator.Close()
+
+		for iterator.HasNext() {
+			queryResponse, err := iterator.Next()
+			if err != nil {
+				return nil, fmt.Errorf("failed to retrieve next policy entry during iteration: %v", err)
+			}
+
+			var policy Policy
+			err = json.Unmarshal(queryResponse.Value, &policy)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal policy JSON from value: %v", err)
+			}
+
+			policies = append(policies, policy)
+		}
+
+		if len(policies) == 0 {
+			return nil, fmt.Errorf("no policies found in the ledger")
+		}
+	}
+
+	return policies, nil
 }
 
 // RegisterForPolicy: Allows users to register for a policy, while Org2 queries health records for validation
