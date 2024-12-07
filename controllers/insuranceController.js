@@ -6,6 +6,7 @@ const CONTRACT_NAME = 'registration'; // Name of the Registration chaincode
 
 module.exports = {
     definePolicy: async (req, res) => {
+        console.log(req.body);
         const { policyID, policyType, coverAmount, premium, startDate, endDate, criteriaJSON, diseasesJSON } = req.body;
         try {
             const network = await connectToNetwork('org2', 'Admin@org2.example.com');
@@ -138,6 +139,19 @@ module.exports = {
             res.status(200).json(healthRecord);
         } catch (error) {
             console.error('Error querying health records:', error);
+            res.status(500).json({ error: error.message });
+        }
+    },
+
+    queryAllPolicies: async (req, res) => {
+        try {
+            const network = await connectToNetwork('org2', 'Admin@org2.example.com'); // Update org and admin user as needed
+            const contract = network.getContract(CONTRACT_NAME);
+
+            const result = await contract.evaluateTransaction('QueryAllPolicies');
+            res.status(200).json(JSON.parse(result.toString()));
+        } catch (error) {
+            console.error('Error querying all policies:', error);
             res.status(500).json({ error: error.message });
         }
     }

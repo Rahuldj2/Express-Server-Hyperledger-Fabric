@@ -26,6 +26,7 @@ app.get('/insurance/queryRegistration/:userId/:policyId', insuranceController.qu
 app.post('/insurance/uploadHealthRecords', insuranceController.uploadHealthRecords);//tested
 app.get('/insurance/queryHealthRecords/:id', insuranceController.queryHealthRecords);//tested
 app.get('/insurance/queryHealthRecordsorg1/:id', insuranceController.queryHealthRecordsOrg1);//tested
+app.get('/insurance/queryAllPolicies', insuranceController.queryAllPolicies);
 
 // Claims Routes
 app.post('/claims/uploadPatientDetails', claimsController.uploadPatientDetails);//tested
@@ -34,6 +35,6 @@ app.get('/claims/queryClaim/:userID', claimsController.queryClaim);
 
 // Start the server
 const PORT = 3001;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
 });
