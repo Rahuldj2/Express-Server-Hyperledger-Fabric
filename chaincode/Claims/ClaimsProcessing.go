@@ -27,6 +27,7 @@ type PatientDetails struct {
 	HospitalName    string `json:"hospitalName"`
 	AdmissionDate   string `json:"admissionDate"`
 	DischargeDate   string `json:"dischargeDate"`
+	ClaimStatus     string `json:"claimStatus"`
 }
 type Policy struct {
 	PolicyID      string            `json:"policyId"`
@@ -46,6 +47,7 @@ type Criteria struct {
 
 var patientDetailsList = make(map[string]PatientDetails) // Map to store policies by policyID
 
+var claimDetailsList = make(map[string]Claim)
 
 // UploadPatientDetails allows Org1 to upload patient details to the PDC
 func (s *SmartContract) UploadPatientDetails(ctx contractapi.TransactionContextInterface, userID string, diseaseDiagnosis string, treatmentPlan string, hospitalName string, admissionDate string, dischargeDate string) error {
@@ -56,6 +58,7 @@ func (s *SmartContract) UploadPatientDetails(ctx contractapi.TransactionContextI
 		HospitalName:     hospitalName,
 		AdmissionDate:    admissionDate,
 		DischargeDate:    dischargeDate,
+		ClaimStatus:     "Pending",
 	}
 
 	patientDetailsList[userID]=patientDetails
@@ -184,11 +187,34 @@ func (s *SmartContract) ProcessClaim(ctx contractapi.TransactionContextInterface
 		Status:           "Processed",
 	}
 
+	
+	claimDetailsList[userID] = claim
 	// Serialize the claim to JSON
 	claimJSON, err := json.Marshal(claim)
 	if err != nil {
 		return fmt.Errorf("failed to serialize claim: %v", err)
 	}
+
+	patientDetails.ClaimStatus = "Processed"
+
+	// Update the in-memory map (if the patient exists in the map)
+	if _, exists := patientDetailsList[userID]; exists {
+		patientDetailsList[userID] = patientDetails
+	}
+
+	// Serialize the updated patient details to JSON
+	updatedPatientDetailsJSON, err := json.Marshal(patientDetails)
+	if err != nil {
+		return fmt.Errorf("failed to serialize updated patient details: %v", err)
+	}
+
+	// Update the private data collection with the new patient details
+	err = ctx.GetStub().PutPrivateData("Org1MSPPrivateCollection", userID, updatedPatientDetailsJSON)
+	if err != nil {
+		return fmt.Errorf("failed to update patient details in PDC: %v", err)
+	}
+
+
 
 	// Store the claim details in a collection (e.g., "claims")
 	err = ctx.GetStub().PutPrivateData("ClaimsPrivateCollection", userID, claimJSON)
@@ -199,6 +225,50 @@ func (s *SmartContract) ProcessClaim(ctx contractapi.TransactionContextInterface
 	return nil
 }
 
+
+
+// QueryAllClaims retrieves all claims from the in-memory list or ledger
+func (s *SmartContract) QueryAllClaims(ctx contractapi.TransactionContextInterface) ([]Claim, error) {
+	var claims []Claim
+
+	// First, check if claims are available in the in-memory store
+	if len(claimDetailsList) > 0 {
+		for _, claim := range claimDetailsList {
+			claims = append(claims, claim)
+		}
+	} else {
+		// If no claims in-memory, query the ledger
+		startKey := ""
+		endKey := ""
+
+		iterator, err := ctx.GetStub().GetStateByRange(startKey, endKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve claims from ledger: %v", err)
+		}
+		defer iterator.Close()
+
+		for iterator.HasNext() {
+			queryResponse, err := iterator.Next()
+			if err != nil {
+				return nil, fmt.Errorf("failed to retrieve next claim entry during iteration: %v", err)
+			}
+
+			var claim Claim
+			err = json.Unmarshal(queryResponse.Value, &claim)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal claim JSON from value: %v", err)
+			}
+
+			claims = append(claims, claim)
+		}
+
+		if len(claims) == 0 {
+			return nil, fmt.Errorf("no claims found in the ledger")
+		}
+	}
+
+	return claims, nil
+}
 
 // QueryClaim retrieves claim details by userID
 func (s *SmartContract) QueryClaim(ctx contractapi.TransactionContextInterface, userID string) (*Claim, error) {
