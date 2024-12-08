@@ -32,6 +32,8 @@ app.get('/insurance/queryAllPolicies', insuranceController.queryAllPolicies);
 app.post('/claims/uploadPatientDetails', claimsController.uploadPatientDetails);//tested
 app.post('/claims/processClaim', claimsController.processClaim);
 app.get('/claims/queryClaim/:userID', claimsController.queryClaim);
+app.get('/claims/queryAllPatientData', claimsController.queryAllPatientData);
+app.get('/claims/queryAllClaims', claimsController.queryAllClaims);
 
 // Start the server
 const PORT = 3001;

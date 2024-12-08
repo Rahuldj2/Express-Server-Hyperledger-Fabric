@@ -56,5 +56,31 @@ module.exports = {
             console.error('Error querying claim:', error);
             res.status(500).json({ error: error.message });
         }
-    }
+    },
+
+    queryAllPatientData: async (req, res) => {
+        try {
+            const network = await connectToNetwork('org2', 'Admin@org2.example.com'); // Update org and admin user as needed
+            const contract = network.getContract(CLAIMS_CONTRACT);
+
+            const result = await contract.evaluateTransaction('QueryAllPatientData');
+            res.status(200).json(JSON.parse(result.toString()));
+        } catch (error) {
+            console.error('Error querying all policies:', error);
+            res.status(500).json({ error: error.message });
+        }
+    },
+
+    queryAllClaims: async (req, res) => {
+        try {
+            const network = await connectToNetwork('org2', 'Admin@org2.example.com'); // Update org and admin user as needed
+            const contract = network.getContract(CLAIMS_CONTRACT);
+
+            const result = await contract.evaluateTransaction('QueryAllClaims');
+            res.status(200).json(JSON.parse(result.toString()));
+        } catch (error) {
+            console.error('Error querying all policies:', error);
+            res.status(500).json({ error: error.message });
+        }
+    },
 };
